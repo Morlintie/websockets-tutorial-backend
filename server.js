@@ -1,27 +1,34 @@
-const { createServer } = require("http");
 const express = require("express");
-const { Server } = require("socket.io");
+const cloudinary = require("cloudinary").v2;
+const http = require("http");
+const connectDB = require("./db/connection");
 
 const app = express();
-const httpServer = createServer(app);
+const server = http.createServer(app);
+const userRouter = require("./routes/userRouter");
 
-const io = new Server(httpServer, {
-  cors: {
-    origin: "http://localhost:5173",
-  },
-});
+app.use(express.json({ limit: "4mb" }));
+app.use(express.urlencoded({ extended: true, limit: "4mb" }));
+app.use(
+  cloudinary.config({
+    could_name: process.env.CLOUD_NAME,
+    api_key: process.env.CLOUD_API_KEY,
+    api_secret: process.env.CLOUD_API_SECRET,
+  })
+);
 
-let scores = [];
-io.on("connection", (socket) => {
-  console.log("A user connected: " + socket.id);
+app.use("/user", userRouter);
 
-  socket.on("score", (data) => {
-    scores = [...scores, data];
+const connection = async () => {
+  try {
+    await connectDB();
+    server.listen(3000, () => {
+      console.log("Server is running on port 3000");
+    });
+  } catch (error) {
+    console.error("Error connecting to the database:", error);
+    process.exit(1);
+  }
+};
 
-    socket.emit("scores", scores);
-  });
-});
-
-httpServer.listen(3000, () => {
-  console.log("Server is running on port 3000");
-});
+connection();
