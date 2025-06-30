@@ -18,6 +18,7 @@ app.use(
 );
 
 app.use("/user", userRouter);
+app.use("/messages", messageRouter);
 
 const connection = async () => {
   try {

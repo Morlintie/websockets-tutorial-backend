@@ -1,33 +1,36 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
-const userSchema = new mongoose.Schema({
-  fullName: { type: String, required: true },
-  email: {
-    type: String,
-    required: true,
-    validation: {
-      validator: async function (v) {
-        const user = await this.constructor.findOne({ email: v });
-        return !user;
+const userSchema = new mongoose.Schema(
+  {
+    fullName: { type: String, required: true },
+    email: {
+      type: String,
+      required: true,
+      validation: {
+        validator: async function (v) {
+          const user = await this.constructor.findOne({ email: v });
+          return !user;
+        },
+        message: "Email already exists",
       },
-      message: "Email already exists",
+      validation: {
+        validator: function (v) {
+          return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v);
+        },
+        message: "Invalid email format",
+      },
     },
-    validation: {
-      validator: function (v) {
-        return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v);
-      },
-      message: "Invalid email format",
+    password: { type: String, required: true, minlength: 6 },
+    profilePic: { type: String },
+    bio: {
+      type: String,
+      maxLength: 500,
+      default: "Hey there! I'm using quickchat.",
     },
   },
-  password: { type: String, required: true, minlength: 6 },
-  profilePic: { type: String },
-  bio: {
-    type: String,
-    maxLength: 500,
-    default: "Hey there! I'm using quickchat.",
-  },
-});
+  { timestamps: true }
+);
 
 userSchema.pre("save", async function () {
   if (this.isModified("password")) {
