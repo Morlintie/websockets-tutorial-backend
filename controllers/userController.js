@@ -12,26 +12,12 @@ const crypto = require("crypto");
 
 const signupUser = async (req, res) => {
   try {
-    const { fullName, email, password, profilePic, bio } = req.body;
+    const { fullName, email, password, bio } = req.body;
 
     if (!fullName || !email || !password) {
       throw new BadRequestError("Please provide all values");
     }
-    if (profilePic) {
-      const result = await cloudinary.uploader.upload(profilePic, {
-        folder: "quickchat/profilePics",
-        use_filename: true,
-      });
-      let profilePicture = result.secure_url;
-      const user = await User.create({
-        fullName,
-        email,
-        password,
-        profilePic: profilePicture,
-        bio: bio || "Hey there! I'm using quickchat.",
-      });
-      res.status(StatusCodes.CREATED).json({ user });
-    }
+
     const user = await User.create({
       fullName,
       email,
@@ -127,6 +113,16 @@ const updateUser = async (req, res) => {
     if (!user) {
       throw new NotFoundError("User not found");
     }
+
+    let token = await Token.findOne({ user: user._id });
+    if (!token) {
+      const prevToken = crypto.randomBytes(64).toString("hex");
+      token = await Token.create({
+        user: user._id,
+        token: prevToken,
+      });
+    }
+    createCookie(user, token.token, res);
 
     res.status(StatusCodes.OK).json({ user });
   } catch (error) {

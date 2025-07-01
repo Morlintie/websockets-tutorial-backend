@@ -1,6 +1,8 @@
 const { StatusCodes } = require("http-status-codes");
 const { BadRequestError } = require("../errors");
+const { io, onlineUsers } = require("../server");
 const Message = require("../models/Message");
+const User = require("../models/User");
 
 const getUnreadMessages = async (req, res) => {
   try {
@@ -85,4 +87,65 @@ const markMessagesAsSeen = async (req, res) => {
       error: error.message || "Internal Server Error",
     });
   }
+};
+
+const sentMessage = async (req, res) => {
+  const { userId } = req.user;
+  const { id } = req.params;
+  const { message, image } = req.body;
+  if (!id) {
+    throw new BadRequestError("Please provide user id");
+  }
+
+  const user = await User.findOne({ _id: id });
+  if (!user) {
+    throw new BadRequestError("User not found");
+  }
+  if (image) {
+    const result = await cloudinary.uploader.upload(image, {
+      folder: "quickchat/messages",
+      use_filename: true,
+    });
+    const newMessage = await Message.create({
+      senderId: userId,
+      receiverId: id,
+      message,
+      image: result.secure_url,
+    });
+    const receiverSocketId = onlineUsers[id];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("newMessage", {
+        text: newMessage,
+        senderId: userId,
+        receiverId: id,
+        image: result.secure_url,
+        seen: false,
+      });
+    }
+    res.status(StatusCodes.CREATED).json({ message: newMessage });
+  }
+  const newMessage = await Message.create({
+    senderId: userId,
+    receiverId: id,
+    text: message || "",
+  });
+
+  const receiverSocketId = onlineUsers[id];
+  if (receiverSocketId) {
+    io.to(receiverSocketId).emit("newMessage", {
+      text: newMessage,
+      senderId: userId,
+      receiverId: id,
+
+      seen: false,
+    });
+  }
+  res.status(StatusCodes.CREATED).json({ message: newMessage });
+};
+
+module.exports = {
+  getUnreadMessages,
+  getMessages,
+  markMessagesAsSeen,
+  sentMessage,
 };

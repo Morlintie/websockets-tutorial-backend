@@ -1,11 +1,20 @@
 const express = require("express");
 const cloudinary = require("cloudinary").v2;
 const http = require("http");
+const { Server } = require("socket.io");
 const connectDB = require("./db/connection");
 
 const app = express();
 const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173",
+    credentials: true,
+  },
+});
+
 const userRouter = require("./routes/userRouter");
+const messageRouter = require("./routes/messageRouter");
 
 app.use(express.json({ limit: "4mb" }));
 app.use(express.urlencoded({ extended: true, limit: "4mb" }));
@@ -20,6 +29,20 @@ app.use(
 app.use("/user", userRouter);
 app.use("/messages", messageRouter);
 
+let onlineUsers = {};
+io.on("connection", (socket) => {
+  const userId = socket.handshake.query.userId;
+  if (userId) {
+    onlineUsers[userId] = socket.id;
+  }
+  io.emit("onlineUsers", onlineUsers);
+
+  socket.on("disconnect", () => {
+    delete onlineUsers[userId];
+    io.emit("onlineUsers", onlineUsers);
+  });
+});
+
 const connection = async () => {
   try {
     await connectDB();
@@ -33,3 +56,5 @@ const connection = async () => {
 };
 
 connection();
+
+module.exports = { io, onlineUsers };
