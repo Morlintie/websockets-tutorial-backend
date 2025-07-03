@@ -2,10 +2,22 @@ const express = require("express");
 const cloudinary = require("cloudinary").v2;
 const http = require("http");
 const { Server } = require("socket.io");
+const cors = require("cors");
 const connectDB = require("./db/connection");
+const userRouter = require("./routes/userRouter");
+const messageRouter = require("./routes/messageRouter");
+const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
+const fileUpload = require("express-fileupload");
 
 const app = express();
 const server = http.createServer(app);
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 const io = new Server(server, {
   cors: {
     origin: "http://localhost:5173",
@@ -13,24 +25,16 @@ const io = new Server(server, {
   },
 });
 
-const userRouter = require("./routes/userRouter");
-const messageRouter = require("./routes/messageRouter");
-
-app.use(express.json({ limit: "4mb" }));
-app.use(express.urlencoded({ extended: true, limit: "4mb" }));
 app.use(
-  cloudinary.config({
-    could_name: process.env.CLOUD_NAME,
-    api_key: process.env.CLOUD_API_KEY,
-    api_secret: process.env.CLOUD_API_SECRET,
+  fileUpload({
+    useTempFiles: true,
+    tempFileDir: "/tmp/",
   })
 );
 
-app.use("/user", userRouter);
-app.use("/messages", messageRouter);
-
 let onlineUsers = {};
 io.on("connection", (socket) => {
+  console.log("New client connected:", socket.id);
   const userId = socket.handshake.query.userId;
   if (userId) {
     onlineUsers[userId] = socket.id;
@@ -42,6 +46,24 @@ io.on("connection", (socket) => {
     io.emit("onlineUsers", onlineUsers);
   });
 });
+
+app.set("io", io);
+app.set("onlineUsers", onlineUsers);
+
+app.use(express.json({ limit: "4mb" }));
+app.use(express.urlencoded({ extended: true, limit: "4mb" }));
+
+app.use(cookieParser(process.env.JWT_SECRET));
+app.use(morgan("tiny"));
+
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME, // Correct the typo: 'could_name' -> 'cloud_name'
+  api_key: process.env.CLOUD_API_KEY,
+  api_secret: process.env.CLOUD_API_SECRET,
+});
+
+app.use("/api/user", userRouter);
+app.use("/api/messages", messageRouter);
 
 const connection = async () => {
   try {
@@ -56,5 +78,3 @@ const connection = async () => {
 };
 
 connection();
-
-module.exports = { io, onlineUsers };

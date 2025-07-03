@@ -27,6 +27,7 @@ const signupUser = async (req, res) => {
 
     res.status(StatusCodes.CREATED).json({ user });
   } catch (error) {
+    console.error(error);
     res.status(error.statusCode).json({
       error: error.message || "Internal Serve Error",
     });
@@ -39,7 +40,7 @@ const loginUser = async (req, res) => {
     if (!email || !password) {
       throw new BadRequestError("Please provide all data");
     }
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select();
     if (!user) {
       throw new NotFoundError("User not found");
     }
@@ -59,7 +60,8 @@ const loginUser = async (req, res) => {
 
     res.status(StatusCodes.OK).json({ user });
   } catch (error) {
-    res.status(error.statusCode).json({
+    console.error(error);
+    res.status(500).json({
       error: error.message || "Internal Server Error",
     });
   }
@@ -68,13 +70,14 @@ const loginUser = async (req, res) => {
 const showUser = async (req, res) => {
   try {
     const { userId } = req.user;
+
     const user = await User.findOne({ _id: userId }).select("-password -__v");
     if (!user) {
       throw new NotFoundError("User not found");
     }
     res.status(StatusCodes.OK).json({ user });
   } catch (error) {
-    res.status(error.statusCode).json({
+    res.status(500).json({
       error: error.message || "Internal Server Error",
     });
   }
@@ -82,10 +85,14 @@ const showUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
+    console.log("hit the update user endpoint");
+    console.log(req.body);
     const { userId } = req.user;
-    const { fullName, email, password, bio } = req.body;
-    const { profilePic } = req.files;
-    const updateObject = { fullName, email, password, profilePic: "", bio };
+    const fullName = req?.body?.fullName;
+    const bio = req?.body?.bio;
+    const profilePic = req?.files?.profilePic;
+    const updateObject = { fullName, profilePic: "", bio };
+    console.log(profilePic);
 
     if (profilePic) {
       const result = await cloudinary.uploader.upload(profilePic.tempFilePath, {
@@ -126,7 +133,8 @@ const updateUser = async (req, res) => {
 
     res.status(StatusCodes.OK).json({ user });
   } catch (error) {
-    res.status(error.statusCode).json({
+    console.error(error);
+    res.status(500).json({
       error: error.message || "Internal Server Error",
     });
   }

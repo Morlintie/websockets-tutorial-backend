@@ -59,7 +59,9 @@ userSchema.pre("findOneAndUpdate", async function () {
 
 userSchema.methods.comparePassword = async function (candidatePassword) {
   try {
-    return await bcrypt.compare(candidatePassword, this.password);
+    const isMatch = await bcrypt.compare(candidatePassword, this.password);
+
+    return isMatch;
   } catch (error) {
     console.error("Error comparing password:", error);
   }

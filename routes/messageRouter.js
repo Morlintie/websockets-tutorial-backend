@@ -12,6 +12,13 @@ const router = express.Router();
 router.get("/unread", authenticationMiddleware, getUnreadMessages);
 router.get("/:id", authenticationMiddleware, getMessages);
 router.patch("/seen/:id", authenticationMiddleware, markMessagesAsSeen);
-router.post("send/:id", authenticationMiddleware, sentMessage);
+router.post(
+  "/send/:id",
+  authenticationMiddleware,
+
+  (req, res) => {
+    sentMessage(req, res, req.app.get("io"), req.app.get("onlineUsers"));
+  }
+);
 
 module.exports = router;

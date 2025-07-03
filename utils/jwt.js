@@ -1,19 +1,16 @@
 const jwt = require("jsonwebtoken");
 const { StatusCodes } = require("http-status-codes");
 
-const createCookie = (user, refreshToken, res) => {
-  const refreshToken = jwt.sign(
-    { ...user, refreshToken },
-    process.env.JWT_SECRET
-  );
-  const accessToken = jwt.sign(user, process.env.JWT_SECRET);
+const createCookie = (user, token, res) => {
+  const refreshToken = jwt.sign({ ...user, token }, process.env.JWT_SECRET);
+  const accessToken = jwt.sign({ user }, process.env.JWT_SECRET);
 
   const refreshTokenExpiry = 1000 * 60 * 60 * 24 * 30;
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    expires: new Date(Date.now()) + refreshTokenExpiry,
+    expires: new Date(Date.now() + refreshTokenExpiry),
     signed: true,
   });
 
@@ -21,21 +18,24 @@ const createCookie = (user, refreshToken, res) => {
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    expires: new Date(Date.now()) + accessTokenExpiry,
+    expires: new Date(Date.now() + accessTokenExpiry),
     signed: true,
   });
 };
 
 const verifyCookie = (req, res) => {
   const { accessToken, refreshToken } = req.signedCookies;
+
   if (accessToken) {
     try {
       const user = jwt.verify(accessToken, process.env.JWT_SECRET);
+
       const reqUser = {
-        userId: user.userId,
-        fullName: user.fullName,
-        email: user.email,
+        userId: user?.user._id,
+        fullName: user?.user.fullName,
+        email: user?.user.email,
       };
+
       return reqUser;
     } catch (error) {
       res
@@ -47,9 +47,9 @@ const verifyCookie = (req, res) => {
     try {
       const user = jwt.verify(refreshToken, process.env.JWT_SECRET);
       const reqUser = {
-        userId: user.userId,
-        fullName: user.fullName,
-        email: user.email,
+        userId: user?.user._id,
+        fullName: user?.user.fullName,
+        email: user?.user.email,
       };
 
       createCookie(reqUser, user.refreshToken, res);

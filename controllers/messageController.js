@@ -1,8 +1,9 @@
 const { StatusCodes } = require("http-status-codes");
-const { BadRequestError } = require("../errors");
-const { io, onlineUsers } = require("../server");
+const { BadRequestError, NotFoundError } = require("../errors");
+
 const Message = require("../models/Message");
 const User = require("../models/User");
+const cloudinary = require("cloudinary").v2;
 
 const getUnreadMessages = async (req, res) => {
   try {
@@ -18,8 +19,7 @@ const getUnreadMessages = async (req, res) => {
         seen: false,
       });
       return {
-        userId: user._id,
-        unreadMessages: messages.length,
+        [user._id]: messages.length,
       };
     });
 
@@ -89,58 +89,55 @@ const markMessagesAsSeen = async (req, res) => {
   }
 };
 
-const sentMessage = async (req, res) => {
-  const { userId } = req.user;
-  const { id } = req.params;
-  const { message, image } = req.body;
-  if (!id) {
-    throw new BadRequestError("Please provide user id");
-  }
+const sentMessage = async (req, res, io, onlineUsers) => {
+  try {
+    const { userId } = req.user;
+    const { id } = req.params;
+    const message = req?.body?.message;
 
-  const user = await User.findOne({ _id: id });
-  if (!user) {
-    throw new BadRequestError("User not found");
-  }
-  if (image) {
-    const result = await cloudinary.uploader.upload(image, {
-      folder: "quickchat/messages",
-      use_filename: true,
-    });
+    const image = req?.files?.image;
+    if (!id) {
+      throw new BadRequestError("Please provide user id");
+    }
+
+    const user = await User.findOne({ _id: id });
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
+    if (image) {
+      const result = await cloudinary.uploader.upload(image.tempFilePath, {
+        folder: "quickchat/messages",
+        use_filename: true,
+      });
+      const newMessage = await Message.create({
+        senderId: userId,
+        receiverId: id,
+        message: message || "",
+        image: result.secure_url,
+      });
+
+      const receiverSocketId = onlineUsers[id];
+      if (receiverSocketId) {
+        console.log("newMessage", newMessage);
+        io.to(receiverSocketId).emit("newMessage", newMessage);
+      }
+      res.status(StatusCodes.CREATED).json({ message: newMessage });
+    }
     const newMessage = await Message.create({
       senderId: userId,
       receiverId: id,
-      message,
-      image: result.secure_url,
+      text: message || "",
     });
+
     const receiverSocketId = onlineUsers[id];
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("newMessage", {
-        text: newMessage,
-        senderId: userId,
-        receiverId: id,
-        image: result.secure_url,
-        seen: false,
-      });
+      console.log(receiverSocketId);
+      io.to(receiverSocketId).emit("newMessage", newMessage);
     }
     res.status(StatusCodes.CREATED).json({ message: newMessage });
+  } catch (error) {
+    console.log(error);
   }
-  const newMessage = await Message.create({
-    senderId: userId,
-    receiverId: id,
-    text: message || "",
-  });
-
-  const receiverSocketId = onlineUsers[id];
-  if (receiverSocketId) {
-    io.to(receiverSocketId).emit("newMessage", {
-      text: newMessage,
-      senderId: userId,
-      receiverId: id,
-
-      seen: false,
-    });
-  }
-  res.status(StatusCodes.CREATED).json({ message: newMessage });
 };
 
 module.exports = {
