@@ -75,6 +75,7 @@ const showUser = async (req, res) => {
     if (!user) {
       throw new NotFoundError("User not found");
     }
+    res.set("Cache-Control", "no-store");
     res.status(StatusCodes.OK).json({ user });
   } catch (error) {
     res.status(500).json({
@@ -86,13 +87,12 @@ const showUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     console.log("hit the update user endpoint");
-    console.log(req.body);
+
     const { userId } = req.user;
     const fullName = req?.body?.fullName;
     const bio = req?.body?.bio;
     const profilePic = req?.files?.profilePic;
     const updateObject = { fullName, profilePic: "", bio };
-    console.log(profilePic);
 
     if (profilePic) {
       const result = await cloudinary.uploader.upload(profilePic.tempFilePath, {

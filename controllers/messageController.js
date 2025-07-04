@@ -14,16 +14,20 @@ const getUnreadMessages = async (req, res) => {
 
     const unreadMessages = users.map(async (user) => {
       const messages = await Message.find({
-        sender: user._id,
-        receiver: userId,
+        senderId: user._id,
+        receiverId: userId,
         seen: false,
       });
+      console.log("messages", messages);
       return {
         [user._id]: messages.length,
       };
     });
 
     const unreadMessagesResults = await Promise.all(unreadMessages);
+
+    res.set("Cache-Control", "no-store");
+    console.log("unreadMessagesResults", unreadMessagesResults);
     res.status(StatusCodes.OK).json({
       users,
       unreadMessages: unreadMessagesResults,
@@ -47,6 +51,16 @@ const getMessages = async (req, res) => {
     if (!user) {
       throw new BadRequestError("User not found");
     }
+
+    await Message.updateMany(
+      {
+        $or: [
+          { senderId: userId, receiverId: id },
+          { senderId: id, receiverId: userId },
+        ],
+      },
+      { seen: true }
+    );
     const messages = await Message.find({
       $or: [
         { senderId: userId, receiverId: id },
@@ -54,8 +68,9 @@ const getMessages = async (req, res) => {
       ],
     }).sort("createdAt");
 
+    res.set("Cache-Control", "no-store");
     res.status(StatusCodes.OK).json({
-      messages,
+      messages: messages || [],
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({
@@ -98,6 +113,11 @@ const sentMessage = async (req, res, io, onlineUsers) => {
     const image = req?.files?.image;
     if (!id) {
       throw new BadRequestError("Please provide user id");
+    }
+    if (message) {
+      if (message === "") {
+        throw new BadRequestError("Message cannot be empty");
+      }
     }
 
     const user = await User.findOne({ _id: id });

@@ -7,20 +7,23 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: true,
-      validation: {
-        validator: async function (v) {
-          const user = await this.constructor.findOne({ email: v });
-          return !user;
+      validate: [
+        {
+          validator: async function (v) {
+            const user = await this.constructor.findOne({ email: v });
+            return !user;
+          },
+          message: "Email already exists",
         },
-        message: "Email already exists",
-      },
-      validation: {
-        validator: function (v) {
-          return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v);
+        {
+          validator: function (v) {
+            return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v);
+          },
+          message: "Invalid email format",
         },
-        message: "Invalid email format",
-      },
+      ],
     },
+
     password: { type: String, required: true, minlength: 6 },
     profilePic: { type: String },
     bio: {
